@@ -1,0 +1,38 @@
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  min-width: 1024px;
+}
+
+li {
+  list-style: none;
+}
+
+.el-submenu__icon-arrow {
+  font-size: 0px;
+}
+
+.el-breadcrumb {
+  margin-bottom: 20px;
+}
+
+textarea {
+  width: 70% !important;
+  height: 200px !important;
+}
+
+.el-upload-list--picture .el-upload-list__item {
+  width: 300px;
+}
+
+.ql-editor {
+  height: 200px !important;
+}
+
+.hide{
+  display: none;
+}
