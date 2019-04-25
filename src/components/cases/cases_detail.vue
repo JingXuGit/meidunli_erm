@@ -57,9 +57,11 @@
       <el-form-item label="上传图片" prop="thumbnail">
         <el-upload
           class="upload-demo"
-          :action="$config.url + '/admin/speak/upload/'"
+          :action="'/admin/speak/upload/'"
           :on-preview="handlePreview"
           :on-remove="handleRemove"
+          :on-exceed="onExceed"
+          :http-request="onUpload"
           :file-list="fileList"
           list-type="picture"
           :limit="1"
@@ -79,6 +81,18 @@
       </el-form-item>
       <!-- 富文本编辑器 -->
       <el-form-item>
+        <el-upload
+          :action="'/admin/speak/upload/'"
+          :http-request="quillUploadImg"
+          :file-list="editFilelist"
+          list-type="picture"
+          :multiple="true"
+          style="display:none"
+        >
+          <el-button id="imgInput" size="small" type="primary"
+            >点击上传</el-button
+          >
+        </el-upload>
         <quill-editor
           v-model="ruleForm.post_content"
           ref="myQuillEditor"
@@ -99,6 +113,7 @@
 <script>
 import { quillEditor, Quill } from "vue-quill-editor";
 import { container, ImageExtend, QuillWatch } from "quill-image-extend-module";
+import { uploadImg } from "../../CosAuth.js";
 Quill.register("modules/ImageExtend", ImageExtend);
 export default {
   components: { quillEditor },
@@ -118,7 +133,9 @@ export default {
             container: container,
             handlers: {
               image: function() {
-                QuillWatch.emit(this.quill.id);
+                // QuillWatch.emit(this.quill.id);
+                let fileInput = document.getElementById("imgInput");
+                fileInput.click(); // 加一个触发事件
               }
             }
           }
@@ -155,7 +172,18 @@ export default {
         ],
         audio: [{ required: true, message: "请输入音频地址", trigger: "blur" }]
       },
-      fileList: [],
+      fileList: [
+        {
+          name: "",
+          url: ""
+        }
+      ],
+      editFilelist: [
+        // {
+        //   name: "",
+        //   url: ""
+        // }
+      ],
       /* 讲者列表 */
       speaker: [],
       file: {}
@@ -216,13 +244,65 @@ export default {
       }
       return isLt2M;
     },
+
+    onUpload(param) {
+      this.uploadImg(param.file);
+    },
+    onExceed(param) {
+      this.uploadImg(param[0]);
+    },
+
+    uploadImg(file) {
+      if (!file) return;
+      uploadImg(file, (err, data) => {
+        if (err) {
+          this.$message("图片上传失败");
+          return;
+        }
+        if (data.statusCode == 200) {
+          let imgurl = data.Location;
+          if (imgurl.indexOf("http") != 0) {
+            imgurl = "https://" + imgurl;
+          }
+          this.ruleForm.thumbnail = imgurl;
+          this.fileList[0].url = imgurl;
+        }
+      });
+    },
     /* 富文本编辑器方法 */
     onEditorReady(editor) {
       // 准备编辑器
     },
     onEditorBlur() {}, // 失去焦点事件
     onEditorFocus() {}, // 获得焦点事件
-    onEditorChange() {} // 内容改变事件
+    onEditorChange() {}, // 内容改变事件
+    /* 富文本上传腾讯云方法 */
+    quillUploadImg(param) {
+      let file = param.file;
+      if (!file) return;
+      uploadImg(file, (err, data) => {
+        if (err) {
+          this.$message("图片上传失败");
+          return;
+        }
+        if (data.statusCode == 200) {
+          let imgurl = data.Location;
+          if (imgurl.indexOf("http") != 0) {
+            imgurl = "https://" + imgurl;
+          }
+          let length =
+            (this.$refs.myQuillEditor.quill.getSelection() || {}).index ||
+            this.$refs.myQuillEditor.quill.getLength();
+          this.$refs.myQuillEditor.quill.insertEmbed(
+            length,
+            "image",
+            imgurl,
+            "user"
+          );
+          this.$refs.myQuillEditor.quill.setSelection(length + 1);
+        }
+      });
+    }
   },
   computed: {
     editor() {

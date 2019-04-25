@@ -57,15 +57,14 @@
       <el-form-item label="上传图片" prop="thumbnail">
         <el-upload
           class="upload-demo"
-          :action="$config.url + '/admin/speak/upload/'"
-          :on-preview="handlePreview"
-          :on-remove="handleRemove"
+          :action="'/admin/speak/upload/'"
+          :on-exceed="onExceed"
+          :http-request="onUpload"
           :file-list="fileList"
           list-type="picture"
           :limit="1"
           :multiple="false"
           :on-success="success"
-          :on-error="error"
           :before-upload="beforeUpload"
         >
           <el-button size="small" type="primary">点击上传</el-button>
@@ -79,13 +78,22 @@
       </el-form-item>
       <!-- 富文本编辑器 -->
       <el-form-item>
+        <el-upload
+          :action="'/admin/speak/upload/'"
+          :http-request="quillUploadImg"
+          :file-list="editFilelist"
+          list-type="picture"
+          :multiple="true"
+          style="display:none"
+        >
+          <el-button id="imgInput" size="small" type="primary"
+            >点击上传</el-button
+          >
+        </el-upload>
         <quill-editor
           v-model="ruleForm.post_content"
           ref="myQuillEditor"
           :options="editorOption"
-          @blur="onEditorBlur($event)"
-          @focus="onEditorFocus($event)"
-          @change="onEditorChange($event)"
         >
         </quill-editor>
       </el-form-item>
@@ -99,6 +107,7 @@
 <script>
 import { quillEditor, Quill } from "vue-quill-editor";
 import { container, ImageExtend, QuillWatch } from "quill-image-extend-module";
+import { uploadImg } from "../../CosAuth.js";
 Quill.register("modules/ImageExtend", ImageExtend);
 export default {
   components: { quillEditor },
@@ -118,8 +127,9 @@ export default {
             container: container,
             handlers: {
               image: function() {
-                QuillWatch.emit(this.quill.id);
-                // document.querySelector(".quill-image-input").click();
+                // QuillWatch.emit(this.quill.id);
+                let fileInput = document.getElementById("imgInput");
+                fileInput.click(); // 加一个触发事件
               }
             }
           }
@@ -134,8 +144,8 @@ export default {
         is_qiyong: null,
         audio: "1.mp3",
         order_num: "0",
-        token: window.localStorage.getItem("token"),
-        thumbnail: ""
+        thumbnail: "",
+        token: window.localStorage.getItem("token")
       },
       /* 表单规则 */
       rules: {
@@ -162,6 +172,7 @@ export default {
           name: ""
         }
       ],
+      editFilelist: [],
       /* 讲者列表 */
       speaker: []
     };
@@ -177,6 +188,24 @@ export default {
       param.append("token", window.localStorage.getItem("token"));
       const { data: data } = await this.$http.post("speak/getSpeakList", param);
       this.speaker = data.data;
+    },
+    /* 获取数据展示 */
+    async list(id) {
+      let param = new URLSearchParams();
+      param.append("id", id);
+      param.append("token", window.localStorage.getItem("token"));
+      const { data: data } = await this.$http.post("case/edit", param);
+      let tmpToken = this.ruleForm.token;
+      this.ruleForm = data.data[0];
+      this.ruleForm.token = tmpToken;
+      this.fileList[0].url = data.data[0].thumbnail;
+      if (this.ruleForm.post_type == 1) {
+        this.ruleForm.post_type = "糖尿病";
+      } else if (this.ruleForm.post_type == 2) {
+        this.ruleForm.post_type = "尿毒症";
+      } else if (this.ruleForm.post_type == 3) {
+        this.ruleForm.post_type = "脑血栓";
+      }
     },
     /* 点击确定按钮 */
     submitForm() {
@@ -210,13 +239,11 @@ export default {
       this.$refs[formName].resetFields();
     },
     /* 上传 */
-    handleRemove(file, fileList) {},
-    handlePreview(file) {},
+
     handleChange(value) {},
     success(response, file, fileList) {
       this.ruleForm.thumbnail = file.response.data.url;
     },
-    error() {},
     beforeUpload(file) {
       console.log(file.size);
       const isLt2M = file.size / 1024 / 1024 < 5;
@@ -228,28 +255,56 @@ export default {
       }
       return isLt2M;
     },
-    /* 富文本编辑器方法 */
-    onEditorReady(editor) {
-      // 准备编辑器
+    /* 上传到腾讯云 */
+    onUpload(param) {
+      this.uploadImg(param.file);
     },
-    onEditorBlur() {}, // 失去焦点事件
-    onEditorFocus() {}, // 获得焦点事件
-    onEditorChange() {}, // 内容改变事件
-    /* 获取数据展示 */
-    async list(id) {
-      let param = new URLSearchParams();
-      param.append("id", id);
-      param.append("token", window.localStorage.getItem("token"));
-      const { data: data } = await this.$http.post("case/edit", param);
-      this.ruleForm = data.data[0];
-      this.fileList[0].url = data.data[0].thumbnail;
-      if (this.ruleForm.post_type == 1) {
-        this.ruleForm.post_type = "糖尿病";
-      } else if (this.ruleForm.post_type == 2) {
-        this.ruleForm.post_type = "尿毒症";
-      } else if (this.ruleForm.post_type == 3) {
-        this.ruleForm.post_type = "脑血栓";
-      }
+    onExceed(param) {
+      this.uploadImg(param[0]);
+    },
+    uploadImg(file) {
+      if (!file) return;
+      uploadImg(file, (err, data) => {
+        if (err) {
+          this.$message("图片上传失败");
+          return;
+        }
+        if (data.statusCode == 200) {
+          let imgurl = data.Location;
+          if (imgurl.indexOf("http") != 0) {
+            imgurl = "https://" + imgurl;
+          }
+          this.ruleForm.thumbnail = imgurl;
+          this.fileList[0].url = imgurl;
+        }
+      });
+    },
+    /* 富文本编辑器上传腾讯云 */
+    quillUploadImg(param) {
+      var file = param.file;
+      if (!file) return;
+      uploadImg(file, (err, data) => {
+        if (err) {
+          this.$message("图片上传失败");
+          return;
+        }
+        if (data.statusCode == 200) {
+          let imgurl = data.Location;
+          if (imgurl.indexOf("http") != 0) {
+            imgurl = "https://" + imgurl;
+          }
+          let length =
+            (this.$refs.myQuillEditor.quill.getSelection() || {}).index ||
+            this.$refs.myQuillEditor.quill.getLength();
+          this.$refs.myQuillEditor.quill.insertEmbed(
+            length,
+            "image",
+            imgurl,
+            "user"
+          );
+          this.$refs.myQuillEditor.quill.setSelection(length + 1);
+        }
+      });
     }
   },
   computed: {
@@ -257,10 +312,7 @@ export default {
       return this.$refs.myQuillEditor.quill;
     }
   },
-  mounted() {
-    let content = ""; // 请求后台返回的内容字符串
-    // this.str = this.escapeStringHTML(content);
-  }
+
 };
 </script>
 <style scoped>

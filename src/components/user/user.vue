@@ -77,17 +77,27 @@
     <!-- TODO -->
     <!-- 表格展示数据 -->
     <el-table :data="tableData" border stripe>
-      <el-table-column prop="id" label="ID" align="center" width="80"> </el-table-column>
+      <el-table-column prop="id" label="ID" align="center" width="80">
+      </el-table-column>
       <el-table-column prop="user_name" label="用户名" align="center">
         <!-- <template slot-scope="scope">
           {{ scope.row.date | dateFormat }}
         </template> -->
       </el-table-column>
-      <el-table-column prop="nick_name" label="昵称" align="center"  width="200"> </el-table-column>
-      <el-table-column prop="branch" label="部门" align="center" width="200"> </el-table-column>
-      <el-table-column prop="男" label="性别" :formatter="formatSex" align="center"  width="200">
+      <el-table-column prop="nick_name" label="昵称" align="center" width="200">
       </el-table-column>
-      <el-table-column prop="mobile" label="手机号码" align="center"> </el-table-column>
+      <el-table-column prop="branch" label="部门" align="center" width="200">
+      </el-table-column>
+      <el-table-column
+        prop="男"
+        label="性别"
+        :formatter="formatSex"
+        align="center"
+        width="200"
+      >
+      </el-table-column>
+      <el-table-column prop="mobile" label="手机号码" align="center">
+      </el-table-column>
       <el-table-column prop="address" label="操作" fixed="right" align="center">
         <template slot-scope="scope">
           <el-button type="primary" size="medium" @click="edit(scope.row.id)"
@@ -202,7 +212,8 @@ export default {
             required: true,
             message: "请输入用户名(英文+字母)",
             trigger: "blur"
-          }
+          },
+          { min: 6, max: 16, message: "长度在 6 到 16 个字符", trigger: "blur" }
         ],
         sex: [{ required: true, message: "请选择性别", trigger: "change" }],
         mobile: [
@@ -217,7 +228,8 @@ export default {
             required: true,
             message: "请输入用户名(英文+字母)",
             trigger: "blur"
-          }
+          },
+          { min: 6, max: 16, message: "长度在 6 到 16 个字符", trigger: "blur" }
         ],
         nick_name: [{ required: true, message: "请输入姓名", trigger: "blur" }],
         sex: [{ required: true, message: "请输入性别", trigger: "blur" }],
@@ -266,6 +278,7 @@ export default {
     },
     /* excel表格导入 */
     importfxx(obj) {
+      console.log(obj);
       let _this = this;
       let inputDOM = this.$refs.inputer;
       // 通过DOM取文件数据
@@ -307,10 +320,54 @@ export default {
             });
           }
           outdata = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); //outdata就是你想要的东西
+          var nameReg = /\u4e00-\u9fa5/g;
+          var telReg = /^1([38]\d|5[0-35-9]|7[3678])\d{8}$/;
+          console.log(outdata);
+          for (var i = 0; i < outdata.length; i++) {
+            if (!outdata[i].用户名) {
+              var inputHtml = document.getElementById("upload");
+              inputHtml.value = "";
+              return _this.$message("存在用户名为空的情况!");
+            }
+            if (outdata[i].用户名.length < 6) {
+              _this.$message(outdata[i].用户名 + " 用户名长度错误");
+              var inputHtml = document.getElementById("upload");
+              inputHtml.value = "";
+              return;
+            } else if (escape(outdata[i].用户名).indexOf("%u") != -1) {
+              _this.$message(outdata[i].用户名 + " 用户名不能为汉字");
+              var inputHtml = document.getElementById("upload");
+              inputHtml.value = "";
+              return;
+            }
+            if (!outdata[i].手机号) {
+              var inputHtml = document.getElementById("upload");
+              inputHtml.value = "";
+              return _this.$message("存在手机号为空的情况!");
+            }
+            if (!telReg.test(outdata[0].手机号)) {
+              _this.$message(outdata[i].手机号 + " 手机号错误!");
+              var inputHtml = document.getElementById("upload");
+              inputHtml.value = "";
+              return;
+            }
+            if (!outdata[i].性别) {
+              var inputHtml = document.getElementById("upload");
+              inputHtml.value = "";
+              return _this.$message("存在性别为空的情况!");
+            }
+            if (outdata[i].性别 != "男" && outdata[i].性别 != "女") {
+              var inputHtml = document.getElementById("upload");
+              inputHtml.value = "";
+              return _this.$message("性别错误!:" + outdata[i].性别);
+            }
+          }
           var str = JSON.stringify(outdata);
           if (str != "") {
             _this.str = str;
             _this.addAll();
+            var inputHtml = document.getElementById("upload");
+            inputHtml.value = "";
           }
         };
         reader.readAsArrayBuffer(f);
@@ -337,6 +394,7 @@ export default {
           type: "success",
           message: "成功"
         });
+        this.page = 1;
         this.userList();
       }
     },

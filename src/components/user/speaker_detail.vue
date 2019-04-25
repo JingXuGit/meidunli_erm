@@ -45,9 +45,11 @@
       <el-form-item label="上传头像" prop="speak_avatar">
         <el-upload
           class="upload-demo"
-          :action="$config.url + '/admin/speak/upload/'"
+          :action="'/admin/speak/upload/'"
           :on-preview="handlePreview"
           :on-remove="handleRemove"
+          :on-exceed="onExceed"
+          :http-request="onUpload"
           :file-list="fileList"
           list-type="picture"
           :limit="1"
@@ -84,6 +86,7 @@
   </div>
 </template>
 <script>
+import { uploadImg } from "../../CosAuth.js";
 export default {
   data() {
     return {
@@ -130,10 +133,10 @@ export default {
         ]
       },
       fileList: [
-        // {
-        //   name: "",
-        //   url: ""
-        // }
+        {
+          name: "",
+          url: ""
+        }
       ]
     };
   },
@@ -179,6 +182,30 @@ export default {
         });
       }
       return isLt2M;
+    },
+    onUpload(param) {
+      this.uploadImg(param.file);
+    },
+    onExceed(param) {
+      this.uploadImg(param[0]);
+    },
+
+    uploadImg(file) {
+      if (!file) return;
+      uploadImg(file, (err, data) => {
+        if (err) {
+          this.$message("图片上传失败");
+          return;
+        }
+        if (data.statusCode == 200) {
+          let imgurl = data.Location;
+          if (imgurl.indexOf("http") != 0) {
+            imgurl = "https://" + imgurl;
+          }
+          this.ruleForm.speak_avatar = imgurl;
+          this.fileList[0].url = imgurl;
+        }
+      });
     }
   }
 };
